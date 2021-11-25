@@ -1,16 +1,11 @@
 module test
  use cudafor
  implicit none
-
  integer, parameter :: singtype = selected_real_kind(6,37)    ! single precision
  integer, parameter :: doubtype = selected_real_kind(15,307)  ! double precision
-#ifdef SINGLE_PRECISION
- integer, parameter :: mykind    = singtype
- real(mykind), parameter :: tol_iter = 0.00001_mykind
-#else
+ 
  integer, parameter :: mykind    = doubtype
  real(mykind), parameter :: tol_iter = 0.000000001_mykind
-#endif
 
  real(mykind), dimension(:), allocatable  :: x,y
  real(mykind) :: a
@@ -22,3 +17,4 @@ module test
  integer :: iermpi, iercuda
 
 end module
+  

@@ -1,5 +1,6 @@
 program main
   use test
+  use vecadd_mod
   implicit none
   
   allocate(x(N),y(N))
