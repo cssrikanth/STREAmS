@@ -1,0 +1,30 @@
+fort2hip.CLANG_FORMAT_STYLE="\"{BasedOnStyle: llvm, ColumnLimit: 140, BinPackArguments: false, BinPackParameters: false}\""
+
+indexer.PREPROCESS_FORTRAN_FILE     = "gfortran -cpp -E {ddd} {mod_streams} | grep -v \"^# [0-9]\""
+
+LOG_DIR="./log"
+
+LOG_LEVEL="warning"
+
+utils.logging.VERBOSE = False
+
+
+#def myBlockDims(kernelName,dims):
+#    return [256]
+#
+#def myLaunchBounds(kernelName):
+#    print(kernelName)
+#    return "12,1"
+#
+#fort2hip.GET_BLOCK_DIMS = myBlockDims
+#
+#fort2hip.GET_LAUNCH_BOUNDS = myLaunchBounds
+
+
+translator.FORTRAN_2_C_TYPE_MAP     = { 
+  "real" : { 
+    "mykind": "double"
+  }
+}
+
+utils.logging.SKIP_CREATE_GPUFORT_MODULE_FILES = True
