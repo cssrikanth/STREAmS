@@ -1,12 +1,12 @@
-fort2hip.CLANG_FORMAT_STYLE="\"{BasedOnStyle: llvm, ColumnLimit: 140, BinPackArguments: false, BinPackParameters: false}\""
-
-indexer.PREPROCESS_FORTRAN_FILE     = "gfortran -cpp -E {ddd} {mod_streams} | grep -v \"^# [0-9]\""
-
-LOG_DIR="./log"
-
-LOG_LEVEL="warning"
-
-utils.logging.VERBOSE = False
+#fort2hip.CLANG_FORMAT_STYLE="\"{BasedOnStyle: llvm, ColumnLimit: 140, BinPackArguments: false, BinPackParameters: false}\""
+#
+#indexer.PREPROCESS_FORTRAN_FILE     = "gfortran -cpp -E {ddd} {mod_streams} | grep -v \"^# [0-9]\""
+#
+#LOG_DIR="./log"
+#
+#LOG_LEVEL="warning"
+#
+utils.logging.VERBOSE = True
 
 
 #def myBlockDims(kernelName,dims):
@@ -27,4 +27,9 @@ translator.FORTRAN_2_C_TYPE_MAP     = {
   }
 }
 
-utils.logging.SKIP_CREATE_GPUFORT_MODULE_FILES = True
+translator.FORTRAN_TYPE_2_BYTES_MAP     = { # x86_64 
+  "real" : { 
+    "mykind": "8"
+  }
+}
+#utils.logging.SKIP_CREATE_GPUFORT_MODULE_FILES = True

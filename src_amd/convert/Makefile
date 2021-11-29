@@ -2,12 +2,9 @@ include rules.mk
 
 .PHONY: build.hip codegen.hip link.hip clean
 
-INCLUDE   = -I/opt/prod/install/linux-centos7-zen2/gcc-10.3.0/openmpi-4.1.1-3nhzttkoezk5qkhhbnr7fbbydzgeyqjl/include
-FCLIBS    = -L/opt/prod/install/linux-centos7-zen2/gcc-10.3.0/openmpi-4.1.1-3nhzttkoezk5qkhhbnr7fbbydzgeyqjl/lib -lmpi 
-
 codegen.hip:
 	gpufort -w module.F90 -E hip --config-file options.py.in 
-	#gpufort -w kernel.F90 -E hip --config-file options.py.in 
+	#gpufort -w bcdf.F90 -E hip --config-file options.py.in 
 	#gpufort -w combined.F90 -E hip --config-file options.py.in
 build.hip: 
 	#$(HIPCC) $(HIPCC_CFLAGS) -c vecadd_mod-fort2hip.hip.cpp
