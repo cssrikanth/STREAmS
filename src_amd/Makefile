@@ -1,129 +1,20 @@
-#----------------------------------------------------------------------
-# SUPPORTED COMPILE: pgi-cuda, pgi-cuda-sync, pgi, intel, gnu, ibmxl, cray-cuda
-# SUPPORTED MODES  : opt, debug [default=debug]
-# SUPPORTED PRECISIONS (PREC) : single, double [default=double]
-#----------------------------------------------------------------------
-COMPILE = "gnu"
-MODE    = "opt"
-PREC    = "double"
-#----------------------------------------------------------------------
-ifeq (${PREC},"single") # mpif90 shipped with PGI compiler
-    PRECFLAGS = -DSINGLE_PRECISION 
-endif
-#----------------------------------------------------------------------
+include rules.mk
 
-ifeq (${COMPILE},"cray-cuda") # mpif90 shipped with PGI compiler
-    # Pitz-Daint instructions (2020)
-    # module load pgi
-    # module swap PrgEnv-cray PrgEnv-pgi
-    CUDA_HOME = $(CRAY_CUDATOOLKIT_DIR)
-    INCLUDE   = -I $(MPICH_DIR)/include 
-    FCLIBS    = -L$(MPICH_DIR)/lib -lmpich 
-    FC        = pgf90
-    LDFLAGS   = -L$(CUDA_HOME)/lib64
-    ifeq (${MODE},"opt") 
-        OLEVEL = -O3 -Mcuda=ccall -DUSE_CUDA -DCUDA_ASYNC -DNOCUDAAWAREMPI
-    else
-        OLEVEL = -Mcuda=ccall -DUSE_CUDA -DCUDA_ASYNC -g -DNOCUDAAWAREMPI
-    endif
-endif
+.PHONY: build.hip codegen.hip link.hip clean
 
-ifeq (${COMPILE},"pgi-cuda") # mpif90 shipped with PGI compiler
-#   FC = mpipgifort
-    FC = mpif90
-    ifeq (${MODE},"opt") 
-        #OLEVEL = -O3 -Mcuda=ccall,cuda10.2,ptxinfo -DUSE_CUDA -DCUDA_ASYNC #-DNOCUDAAWAREMPI
-        OLEVEL = -O3 -Mcuda=ccall,cuda10.2 -DUSE_CUDA -DCUDA_ASYNC #-DNOCUDAAWAREMPI
-    else
-        OLEVEL = -Mcuda=ccall,cuda10.2 -DUSE_CUDA -DCUDA_ASYNC
-    endif
-endif
+codegen.hip:
+	gpufort -w mod_streams.F90 -E hip --config-file options.py.in 
+	gpufort -w bcdf.F90 -E hip --config-file options.py.in 
+	#gpufort -w combined.F90 -E hip --config-file options.py.in
+build.hip: 
+	$(HIPCC) $(HIPCC_CFLAGS) -c mod_bcdf-fort2hip.hip.cpp
+	$(HIPFC) mod_streams.F90-gpufort.f08 -c $(CFLAGS)
+	$(HIPFC) bcdf.F90-gpufort.f08 -c  $(CFLAGS)
+	#$(HIPFC) combined.F90-gpufort.f08 -c  $(CFLAGS)
+	
+link.hip:
+	$(HIPFC)  -o final combined.F90-gpufort.o  kernel.F90-gpufort.o  module_test.F90-gpufort.o  vecadd_mod-fort2hip.hip.o $(CFLAGS)
+	
 
-ifeq (${COMPILE},"pgi-cuda-sync") # mpif90 shipped with PGI compiler
-    FC = mpif90 
-    ifeq (${MODE},"opt") 
-        OLEVEL = -O3 -Mcuda=ccall,cuda10.2 -DUSE_CUDA
-    else
-        OLEVEL = -Mcuda=ccall,cuda10.2 -DUSE_CUDA
-    endif
-endif
-
-ifeq (${COMPILE},"pgi") # mpif90 shipped with PGI compiler or other MPI
-    FC = mpif90 
-    ifeq (${MODE},"opt") 
-        OLEVEL = -O3 
-    else
-        OLEVEL = -O2 -Mbounds -Ktrap=fp -g
-    endif
-endif
-
-ifeq (${COMPILE},"intel") # mpiifort from IntelMPI
-    FC = mpiifort
-#   FC = mpif90 -fc=gfortran
-    ifeq (${MODE},"opt") 
-        OLEVEL = -O3
-    else
-        OLEVEL = -O2 -check bounds,uninit -g -fpe0 -traceback
-    endif
-endif
-
-ifeq (${COMPILE},"gnu") # mpif90 from MPI library
-    FC = mpif90
-    ifeq (${MODE},"opt") 
-        OLEVEL = -O3
-    else
-        OLEVEL = -O2 -fbounds-check -g -fbacktrace -fdump-core -ffpe-trap=zero,invalid,overflow -Wuninitialized -Wall
-        #OLEVEL = -O2 -fbounds-check -g -fbacktrace -fdump-core
-    endif
-endif
-
-ifeq (${COMPILE},"ibmxl") # mpif90 from MPI library
-    FC = mpif90
-    ifeq (${MODE},"opt") 
-        OLEVEL = -O4
-    else
-        OLEVEL = -O2 -g
-    endif
-endif
-
-RM = rm -f
-
-#----------------------------------------------------------------------
-# Base code
-#----------------------------------------------------------------------
-MAIN = main.o
-OBJ_FILES = alloc.o bcdf.o bcextr.o bcfree.o bc.o bcrecyc.o bcrelax.o bcshk.o bcswap.o \
-    bcwall.o bcwall_pl.o bcwall_staggered.o check_input.o computeav.o computemetrics.o \
-    computeresidual.o compute_coeff_xyz_midpi.o constants.o df_par.o digital_filtering_util.o \
-    finalize.o generategrid.o generateinflowrand.o generatewmean_channel.o \
-    generatewmean.o heatflux_compute.o init_channel.o init.o initurb.o init_windtunnel.o manage_solver.o osw.o pgrad.o \
-    prims.o printres.o readdf.o readgrid.o readinp.o readrst.o readstat.o recyc.o rk.o sensor.o \
-    setup.o solver.o startmpi.o stats.o step.o target_reystress.o tbforce.o updateghost.o utility.o utyibm.o \
-    visflx.o writedf.o writefield.o writefieldvtk.o writegridplot3d.o writerst.o \
-    writestatbl.o writestatchann.o writestat.o writestatzbl.o write_wallpressure.o visflx_stag.o
-
-OBJ_MODS = mod_streams.o mod_sys.o euler.o
-OBJS = $(OBJ_MODS) $(OBJ_FILES) $(MAIN)
-EXEC = streams.exe
-LDFLAGS =
-#----------------------------------------------------------------------
-# Additional package
-#----------------------------------------------------------------------
--include makefile.inc
-#----------------------------------------------------------------------
-
-$(EXEC): $(OBJS) Makefile $(wildcard makefile.inc)
-	$(FC) $(PRECFLAGS) $(OLEVEL) -o $@ $(OBJS) $(FCLIBS) $(LDFLAGS)
-
-%.o:%.F90 Makefile $(wildcard makefile.inc)
-	$(FC) $(PRECFLAGS) $(INCLUDE) $(OLEVEL) -c $< -o $@
-
-%.o:%.cpp Makefile $(wildcard makefile.inc)
-	$(CXX) $(PRECFLAGS) $(INCLUDE) -O2 -c $< -o $@
-
-%.o:%.cxx Makefile $(wildcard makefile.inc)
-	$(CXX) $(PRECFLAGS) $(INCLUDE) -O2 -c $< -o $@
-
-.PHONY: clean
 clean:
-	$(RM) $(EXEC) $(MAIN) $(OBJS) $(OBJ_MODS) $(GRID) *.mod
+	rm -rf options.py.in *.F90 *-gpufort.* *-fort2hip.* *.o *.mod gpufort*.h $(TEST_NAME) *.gpufort_mod log/
