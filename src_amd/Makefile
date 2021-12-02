@@ -4,6 +4,7 @@ include rules.mk
 
 codegen.hip:
 	gpufort -w mod_streams.F90 -E hip --config-file options.py.in 
+	gpufort -w alloc.F90 -E hip --config-file options.py.in 
 	gpufort -w bcdf.F90 -E hip --config-file options.py.in 
 	#gpufort -w combined.F90 -E hip --config-file options.py.in
 build.hip: 

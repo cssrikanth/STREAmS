@@ -3,9 +3,9 @@ import argparse
 import re
 import json
 
-def create_subroutines(ofile,nfile,config):
+def create_subroutines(ofile,nfile,config,preproc=None):
     #Old file from STREAmS
-    old_file = open(ofile, "r")
+    old_file = open(ofile+nfile, "r")
     old_lines = old_file.readlines()
     
     #Create a new file for hip conversion
@@ -25,10 +25,16 @@ def create_subroutines(ofile,nfile,config):
       stripped_line = line.strip()
   
       #TODO: A bug now, remove when updated
-      if stripped_line[0]=="!" in stripped_line and "cuf" not in stripped_line:
-        new_file.write("!"+stripped_line+"\n")
+      if "!" in stripped_line and "cuf" not in stripped_line:
+        idx = stripped_line.index('!')
+        stripped_line = stripped_line.replace(stripped_line[idx:],"")
+        new_file.write(stripped_line+"\n")
         continue
   
+      #TODO: A bug now, remove when updated
+      if len(stripped_line)==0:
+        continue
+      
       if "::" in stripped_line and marker == 1:
         new_file.write("type(dim3) :: grid, tBlock"+"\n")
         marker=0
@@ -89,6 +95,11 @@ def create_subroutines(ofile,nfile,config):
     old_file.close()
     new_file.close()
 
+    if preproc:
+      tmp_new = "tmp_"+nfile
+      c_prepro(nfile,tmp_new,preproc)
+      os.system("mv "+tmp_new+" "+nfile)
+
 def create_config(filename,precision):
   gpufort_config = open(filename, "w")
   if precision == 'single':
@@ -98,12 +109,15 @@ def create_config(filename,precision):
     gpufort_config.write('translator.FORTRAN_2_C_TYPE_MAP["real"]["mykind"]    = "double"\n')
     gpufort_config.write('translator.FORTRAN_TYPE_2_BYTES_MAP["real"]["mykind"]    = "8"\n\n')
 
+def c_prepro(old_file,new_file,options):
+    os.system("gfortran -cpp -E "+options+" "+old_file+" > "+new_file)
+    os.system("sed -i '/^#/d' "+new_file)
+
 def create_module(old_module,new_module,precision):
   if precision == 'single':
-    os.system("gfortran -cpp -E "+"-DSINGLE_PRECISION -DUSE_CUDA "+old_module+" > "+new_module)
+    c_prepro(old_module,new_module,"-DSINGLE_PRECISION -DUSE_CUDA")
   else:
-    os.system("gfortran -cpp -E "+" -DUSE_CUDA "+old_module+" > "+new_module)
-  os.system("sed -i '/^#/d' "+new_module)
+    c_prepro(old_module,new_module,"-DUSE_CUDA")
 
   #TODO: kind=iercuda not recognised. Ask Dom gpufort
   os.system('sed -i s/"(kind=cuda_stream_kind)"/""/g '+new_module)
@@ -129,11 +143,8 @@ def main():
   #Get module
   create_module(streams_src+mod_file,mod_file,args.precision)
   
-  #Get subroutines
-  files = ['bcdf.F90','bcrecyc.F90']
-  
-  for f in files:
-    create_subroutines(streams_src+f,f,config)
+  create_subroutines(streams_src,"bcdf.F90",config)
+  create_subroutines(streams_src,"alloc.F90",config,"-DUSE_CUDA")
 
 
 if __name__ == "__main__":
