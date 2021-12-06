@@ -1,9 +1,8 @@
 import os
 import argparse
 import re
-import json
 
-def create_subroutines(ofile,nfile,config,preproc=None):
+def create_subroutines(ofile,nfile,thread,preproc=None):
     #Old file from STREAmS
     old_file = open(ofile+nfile, "r")
     old_lines = old_file.readlines()
@@ -34,7 +33,7 @@ def create_subroutines(ofile,nfile,config,preproc=None):
       #TODO: A bug now, remove when updated
       if len(stripped_line)==0:
         continue
-      
+      #TODO: This will fail for multiple subroutines in the same folder with cuf kernels 
       if "::" in stripped_line and marker == 1:
         new_file.write("type(dim3) :: grid, tBlock"+"\n")
         marker=0
@@ -59,24 +58,23 @@ def create_subroutines(ofile,nfile,config,preproc=None):
             st2 = "real("+idx2+"-("+idx1+")+1"+")"
         if nloop == 1:
           spec = "grid = dim3(ceiling("+st0+")/tBlock%x,1,1)"
-          tx = config["one"]["thx"]
-          ty = config["one"]["thy"]
-          tz = config["one"]["thz"]
+          tx = thread[0][0]
+          ty = thread[0][1]
+          tz = thread[0][2]
           new_file.write(f"tBlock = dim3({tx},{ty},{tz})"+"\n")
           new_file.write(spec+"\n\n")
         elif nloop == 2:
           spec = "grid = dim3(ceiling("+st1+")/tBlock%x,"+"ceiling("+st0+")/tBlock%y,"+"1)"
-          tx = config["one"]["thx"]
-          tx = config["two"]["thx"]
-          ty = config["two"]["thy"]
-          tz = config["two"]["thz"]
+          tx = thread[1][0]
+          ty = thread[1][1]
+          tz = thread[1][2]
           new_file.write(f"tBlock = dim3({tx},{ty},{tz})"+"\n")
           new_file.write(spec+"\n\n")
         elif nloop == 3:
           spec = "grid = dim3(ceiling("+st2+")/tBlock%x,"+"ceiling("+st1+")/tBlock%y,"+"ceiling("+st0+")/tBlock%z)"
-          tx = config["three"]["thx"]
-          ty = config["three"]["thy"]
-          tz = config["three"]["thz"]
+          tx = thread[2][0]
+          ty = thread[2][1]
+          tz = thread[2][2]
           new_file.write(f"tBlock = dim3({tx},{ty},{tz})"+"\n")
           new_file.write(spec+"\n\n")
         new_file.write(f"!$cuf kernel do({nloop}) <<<grid,tBlock>>>"+"\n")
@@ -87,7 +85,6 @@ def create_subroutines(ofile,nfile,config,preproc=None):
       if "iercuda" in stripped_line:
         continue
      
-      #To make sure C directives dont get indented 
       new_file.write(stripped_line+"\n")
     
     #Add module in the last line
@@ -123,13 +120,12 @@ def create_module(old_module,new_module,precision):
   os.system('sed -i s/"(kind=cuda_stream_kind)"/""/g '+new_module)
  
 def main():
-  #Load thread parameters
-  with open("config.json","r") as f:
-        config = json.load(f)
+  parser = argparse.ArgumentParser(description='Arguments for STREAmS AMD preprocessor',formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-  parser = argparse.ArgumentParser()
-
-  parser.add_argument("-p", "--precision", help="Precision option", type=str,default="double")
+  parser.add_argument("-p","--precision",help="specify precision of the solver",choices=["single","double"],type=str,default="double")
+  parser.add_argument("-l1","--loop1",metavar=("thread_x","thread_y","thread_z"),help="specify thread parameters if one loop parallel",type=int,default=[256,1,1],nargs=3)
+  parser.add_argument("-l2","--loop2",metavar=("thread_x","thread_y","thread_z"),help="specify thread parameters if two loop parallel",type=int,default=[128,2,1],nargs=3)
+  parser.add_argument("-l3","--loop3",metavar=("thread_x","thread_y","thread_z"),help="specify thread parameters if three loop parallel",type=int,default=[32,4,1],nargs=3)
   
   args = parser.parse_args()
   
@@ -142,10 +138,14 @@ def main():
 
   #Get module
   create_module(streams_src+mod_file,mod_file,args.precision)
-  
-  create_subroutines(streams_src,"bcdf.F90",config)
-  create_subroutines(streams_src,"alloc.F90",config,"-DUSE_CUDA")
+ 
+  #Thread specification
+  thread = [args.loop1,args.loop2,args.loop3]
+  files = [("alloc.F90","-DUSE_CUDA"),("bcdf.F90",None)]
 
+  #Loop through the files
+  for file in files:
+    create_subroutines(streams_src,file[0],thread,file[1])
 
 if __name__ == "__main__":
     main()
