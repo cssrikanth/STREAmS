@@ -119,6 +119,28 @@ def create_module(old_module,new_module,precision):
   #TODO: kind=iercuda not recognised. Ask Dom gpufort
   os.system('sed -i s/"(kind=cuda_stream_kind)"/""/g '+new_module)
  
+  #TODO: Bug when both host and device variables are declared together 
+  old_file = open(new_module, "r")
+  old_lines = old_file.readlines()
+  
+  nfile = 'tmp_file'
+  new_file = open(nfile, "w")
+  for i,line in enumerate(old_lines):
+    stripped_line = line.strip()
+    if i>90 and "::" in stripped_line:
+      left = stripped_line.split("::")[0]
+      right = stripped_line.split("::")[1]
+      var = right.split(",")
+      for v in var:
+        dec = left+"::"+v
+        new_file.write(dec+"\n")
+      continue
+ 
+    new_file.write(stripped_line+"\n")
+  old_file.close()
+  new_file.close()
+  os.system("mv "+nfile+" "+new_module)
+
 def main():
   parser = argparse.ArgumentParser(description='Arguments for STREAmS AMD preprocessor',formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -141,11 +163,12 @@ def main():
  
   #Thread specification
   thread = [args.loop1,args.loop2,args.loop3]
+  # Format: (file,flags)
   files = [("alloc.F90","-DUSE_CUDA"),("bcdf.F90",None)]
 
   #Loop through the files
-  for file in files:
-    create_subroutines(streams_src,file[0],thread,file[1])
+  for f in files:
+    create_subroutines(streams_src,f[0],thread,f[1])
 
 if __name__ == "__main__":
     main()

@@ -10,7 +10,8 @@ codegen.hip:
 build.hip: 
 	$(HIPCC) $(HIPCC_CFLAGS) -c mod_bcdf-fort2hip.hip.cpp
 	$(HIPFC) mod_streams.F90-gpufort.f08 -c $(CFLAGS)
-	$(HIPFC) bcdf.F90-gpufort.f08 -c  $(CFLAGS)
+	$(HIPFC) alloc.F90-gpufort.f08 -c *.mod  $(CFLAGS)
+	#$(HIPFC) bcdf.F90-gpufort.f08 -c  $(CFLAGS)
 	#$(HIPFC) combined.F90-gpufort.f08 -c  $(CFLAGS)
 	
 link.hip:
